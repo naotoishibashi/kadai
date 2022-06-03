@@ -15,18 +15,17 @@ import javax.servlet.http.HttpServletResponse;
 import models.Tasks;
 import models.validators.TaskValidator;
 import utils.DBUtil;
-
 /**
- * Servlet implementation class CreateServlet
+ * Servlet implementation class UpdateServlet
  */
-@WebServlet("/create")
-public class CreateServlet extends HttpServlet {
+@WebServlet("/update")
+public class UpdateServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
 
     /**
      * @see HttpServlet#HttpServlet()
      */
-    public CreateServlet() {
+    public UpdateServlet() {
         super();
         // TODO Auto-generated constructor stub
     }
@@ -39,21 +38,25 @@ public class CreateServlet extends HttpServlet {
         String _token = request.getParameter("_token");
         if (_token != null && _token.equals(request.getSession().getId())) {
             EntityManager em = DBUtil.createEntityManager();
-            em.getTransaction().begin();
 
-            Tasks t = new Tasks();
+            // セッションスコープからメッセージのIDを取得して
+            // 該当のIDのメッセージ1件のみをデータベースから取得
+            Tasks t = em.find(Tasks.class, (Integer) (request.getSession().getAttribute("task_id")));
+
+
 
             String content = request.getParameter("content");
             t.setContent(content);
 
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-            t.setCreated_at(currentTime);
-            t.setUpdated_at(currentTime);
+            t.setUpdated_at(currentTime); // 更新日時のみ上書き
 
+            // バリデーションを実行してエラーがあったら編集画面のフォームに戻る
             List<String> errors = TaskValidator.validate(t);
-            if (errors.size() > 0) {
+            if(errors.size() > 0) {
                 em.close();
 
+                // フォームに初期値を設定、さらにエラーメッセージを送る
                 request.setAttribute("_token", request.getSession().getId());
                 request.setAttribute("task", t);
                 request.setAttribute("errors", errors);
@@ -61,16 +64,19 @@ public class CreateServlet extends HttpServlet {
                 RequestDispatcher rd = request.getRequestDispatcher("/WEB-INF/views/tasks/edit.jsp");
                 rd.forward(request, response);
             } else {
+            // データベースを更新
+            em.getTransaction().begin();
+            em.getTransaction().commit();
 
-                em.persist(t);
-                em.getTransaction().commit();
-                em.close();
+            em.close();
 
-                request.getSession().removeAttribute("task_id");
+            // セッションスコープ上の不要になったデータを削除
+            request.getSession().removeAttribute("task_id");
 
-                response.sendRedirect(request.getContextPath() + "/index");
-            }
+            // indexページへリダイレクト
+            response.sendRedirect(request.getContextPath() + "/index");
         }
-
     }
+
+}
 }
